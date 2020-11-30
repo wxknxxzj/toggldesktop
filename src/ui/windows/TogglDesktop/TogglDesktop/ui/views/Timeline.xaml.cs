@@ -91,6 +91,7 @@ namespace TogglDesktop
             if (sender is FrameworkElement uiElement)
             {
                 TimeEntryPopupContainer.OpenPopupWithRightPlacement(uiElement, MainViewScroll);
+                ViewModel.ActiveTimeEntryBlock = uiElement.DataContext as TimeEntryBlock;
             }
         }
 

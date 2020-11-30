@@ -361,6 +361,7 @@
     <Compile Include="utilities\ColorSchemeExtensions.cs" />
     <Compile Include="utilities\DayOfWeekExtensions.cs" />
     <Compile Include="utilities\LinqExtensions.cs" />
+    <Compile Include="utilities\ReactiveExtensions.cs" />
     <Compile Include="utilities\StaticObjectPool.cs" />
     <Compile Include="TogglApi.cs" />
     <Compile Include="ui\UIExtensions.cs" />

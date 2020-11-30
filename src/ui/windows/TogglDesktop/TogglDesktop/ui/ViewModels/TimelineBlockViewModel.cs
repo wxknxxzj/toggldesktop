@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
 using TogglDesktop.Resources;
@@ -54,12 +55,18 @@ namespace TogglDesktop.ViewModels
         public string Duration { [ObservableAsProperty]get; }
         public string StartEndCaption { [ObservableAsProperty]get; }
         public ReactiveCommand<Unit, Unit> OpenEditView { get; }
+        public ReactiveCommand<Unit, bool> ContinueEntry { get; }
+        public ReactiveCommand<Unit, Unit> CreateFromEnd { get; }
+        public ReactiveCommand<Unit, Unit> StartFromEnd { get; }
+        public ReactiveCommand<Unit, bool> Delete { get; }
         public string TimeEntryId { get; }
 
         [Reactive]
         public bool IsEditViewOpened { get; set; }
 
         public bool IsResizable { [ObservableAsProperty] get; }
+
+        public BehaviorSubject<(DateTime Started, DateTime Ended)> StartEnd { get; }
 
         [Reactive]
         public bool IsDragged { get; set; }
@@ -74,11 +81,16 @@ namespace TogglDesktop.ViewModels
             DateCreated = date;
             TimeEntryId = timeEntryId;
             OpenEditView = ReactiveCommand.Create(() => Toggl.Edit(TimeEntryId, false, Toggl.Description));
-            var startEndObservable = this.WhenAnyValue(x => x.VerticalOffset, x => x.Height, (offset, height) =>
-                (Started: TimelineUtils.ConvertOffsetToDateTime(offset, date, _hourHeight), Ended: TimelineUtils.ConvertOffsetToDateTime(offset + height, date, _hourHeight)));
-            startEndObservable.Select(tuple => $"{tuple.Started:HH:mm tt} - {tuple.Ended:HH:mm tt}")
+            ContinueEntry = ReactiveCommand.Create(() => Toggl.Continue(TimeEntryId));
+            CreateFromEnd = ReactiveCommand.Create(() => TimelineUtils.CreateAndEditTimeEntry(StartEnd.Value.Ended, StartEnd.Value.Ended.AddHours(1)));
+            StartFromEnd = ReactiveCommand.Create(() => TimelineUtils.CreateAndEditRunningTimeEntryFrom(StartEnd.Value.Ended));
+            Delete = ReactiveCommand.Create(() => Toggl.DeleteTimeEntry(TimeEntryId));
+            StartEnd = this.WhenAnyValue(x => x.VerticalOffset, x => x.Height, (offset, height) =>
+                (Started: TimelineUtils.ConvertOffsetToDateTime(offset, date, _hourHeight), Ended: TimelineUtils.ConvertOffsetToDateTime(offset + height, date, _hourHeight)))
+                .ToBehaviorSubject();
+            StartEnd.Select(tuple => $"{tuple.Started:HH:mm tt} - {tuple.Ended:HH:mm tt}")
                 .ToPropertyEx(this, x => x.StartEndCaption);
-            startEndObservable.Select(tuple =>
+            StartEnd.Select(tuple =>
                 {
                     var duration = tuple.Ended.Subtract(tuple.Started);
                     return duration.Hours + " h " + duration.Minutes + " min";
@@ -92,14 +104,12 @@ namespace TogglDesktop.ViewModels
 
         public void ChangeStartTime()
         {
-            Toggl.SetTimeEntryStartTimeStamp(TimeEntryId,
-                (long)TimelineUtils.ConvertOffsetToUnixTime(VerticalOffset, DateCreated, _hourHeight));
+            Toggl.SetTimeEntryStartTimeStamp(TimeEntryId, Toggl.UnixFromDateTime(StartEnd.Value.Started));
         }
 
         public void ChangeEndTime()
         {
-            Toggl.SetTimeEntryEndTimeStamp(TimeEntryId,
-                (long)TimelineUtils.ConvertOffsetToUnixTime(VerticalOffset + Height, DateCreated, _hourHeight));
+            Toggl.SetTimeEntryEndTimeStamp(TimeEntryId, Toggl.UnixFromDateTime(StartEnd.Value.Ended));
         }
 
         public void ChangeStartEndTime()
